@@ -54,7 +54,6 @@ struct Issue {
     id: i64,
     number: i64,
     title: String,
-    html_url: String,
     labels: Vec<IssueLabel>,
 }
 
@@ -84,7 +83,6 @@ impl PartialEq for Issue {
 #[derive(Debug, Deserialize)]
 struct IssueLabel {
     name: String,
-    color: String,
 }
 
 fn generate_labeled_categories<'a>(
@@ -94,8 +92,8 @@ fn generate_labeled_categories<'a>(
 ) -> BTreeMap<String, HashSet<&'a Issue>> {
     let mut categories = BTreeMap::new();
     let mut category_mapping: HashMap<String, String> = HashMap::new();
-    category_mapping.insert("bug".to_string(), "🐛 Fixed Bugs".to_string());
-    let fallback_category = "Closed issues";
+    category_mapping.insert("bug".to_string(), "Fixed Bugs 🐛".to_string());
+    let fallback_category = "Issues Closed";
     for commit in commits {
         if let Some(issue) = &commit.linked_issue {
             if !issues.contains_key(issue) {
@@ -104,8 +102,6 @@ fn generate_labeled_categories<'a>(
 
             let issue = issues.get(issue).unwrap();
 
-            eprintln!("Commit {}: {:?} -> {:?}\n", commit.id, commit, issue);
-
             if filter_label.is_some()
                 && !issue
                     .lower_case_labels()
@@ -113,12 +109,6 @@ fn generate_labeled_categories<'a>(
             {
                 continue;
             }
-
-            eprintln!(
-                "Commit {} has labels: {:?}",
-                commit.id,
-                issue.lower_case_labels()
-            );
 
             for label in issue.lower_case_labels() {
                 if let Some(category_title) = category_mapping.get(&label) {
@@ -140,8 +130,13 @@ fn generate_labeled_categories<'a>(
 }
 
 /// Returns issue number (not internal ID) mapping to actual Issue data.
+///
+/// Using pagination to fetch all issues. Just filters for closed issues.
 fn fetch_issues(github_repo: &str, token: &str) -> anyhow::Result<HashMap<i64, Issue>> {
-    let url = format!("https://api.github.com/repos/{}/issues", github_repo);
+    let url = format!(
+        "https://api.github.com/repos/{}/issues?state=closed",
+        github_repo
+    );
     let mut headers = HeaderMap::new();
     headers.insert(
         AUTHORIZATION,
@@ -161,13 +156,31 @@ fn fetch_issues(github_repo: &str, token: &str) -> anyhow::Result<HashMap<i64, I
     );
 
     let client = Client::new();
-    let issues = client
-        .get(&url)
-        .headers(headers)
-        .send()?
-        .json::<Vec<Issue>>()?;
+    let mut page = 1;
+    let mut all_issues = Vec::new();
 
-    Ok(issues.into_iter().map(|issue| (issue.number, issue)).collect())
+    eprintln!("Fetching issues from: {}", url);
+
+    loop {
+        let paged_url = format!("{}&per_page=100&page={}", url, page);
+        let resp = client
+            .get(&paged_url)
+            .headers(headers.clone())
+            .send()?
+            .json::<Vec<Issue>>()?;
+
+        if resp.is_empty() {
+            break;
+        }
+
+        all_issues.extend(resp);
+        page += 1;
+    }
+
+    Ok(all_issues
+        .into_iter()
+        .map(|issue| (issue.number, issue))
+        .collect())
 }
 
 fn main() -> anyhow::Result<()> {
@@ -198,7 +211,7 @@ fn main() -> anyhow::Result<()> {
         };
 
         commits.push(Commit {
-            id: oid.to_string()[..6].to_string(),
+            id: oid.to_string()[..7].to_string(),
             summary,
             author,
             date,
@@ -208,28 +221,24 @@ fn main() -> anyhow::Result<()> {
 
     let issues = fetch_issues(&args.github_repo, &args.github_token)?;
 
-    // eprint!("Issues: {:?}", issues);
-
     let categories = generate_labeled_categories(&args.filter_label, &commits, &issues);
-
-    eprint!("Categories: {:?}", categories);
-
-    for title in categories.keys() {
-        println!("## {}\n", title);
-        for issue in &categories[title] {
-            println!("- *{}* - #{}", issue.title, issue.number,);
-        }
-    }
 
     let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
 
-    println!("# {} ({})\n", args.from, today);
+    println!("# {} ({})", args.to, today);
 
-    println!("## Full changelog of commits\n");
+    for title in categories.keys() {
+        println!("\n## {}\n", title);
+        for issue in &categories[title] {
+            println!("- {} - #{}", issue.title, issue.number,);
+        }
+    }
+
+    println!("\n## Full changelog of commits\n");
 
     for commit in &commits {
         println!(
-            "- {} - *{}* by {} ({})",
+            "- {} - {} by {} ({})",
             commit.id, commit.summary, commit.author, commit.date
         );
     }
