@@ -1,5 +1,10 @@
 # github-release-generator
 
+Generate a simple GitHub changelog using the GitHub API. Linked issues are shown
+using their issue title while unknown commits are shown in the "raw" changelog.
+
+Check `--help` for possible and required command line arguments.
+
 ## Example Usage
 
 ```sh
