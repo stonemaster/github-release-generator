@@ -86,7 +86,7 @@ struct IssueLabel {
 }
 
 fn generate_labeled_categories<'a>(
-    filter_label: &Option<String>,
+    filter_label: Option<String>,
     commits: &[Commit],
     issues: &'a HashMap<i64, Issue>,
 ) -> BTreeMap<String, HashSet<&'a Issue>> {
@@ -94,6 +94,7 @@ fn generate_labeled_categories<'a>(
     let mut category_mapping: HashMap<String, String> = HashMap::new();
     category_mapping.insert("bug".to_string(), "Fixed Bugs 🐛".to_string());
     let fallback_category = "Issues Closed";
+    let filter_label = filter_label.map(|label| label.to_lowercase());
     for commit in commits {
         if let Some(issue) = &commit.linked_issue {
             if !issues.contains_key(issue) {
@@ -221,7 +222,7 @@ fn main() -> anyhow::Result<()> {
 
     let issues = fetch_issues(&args.github_repo, &args.github_token)?;
 
-    let categories = generate_labeled_categories(&args.filter_label, &commits, &issues);
+    let categories = generate_labeled_categories(args.filter_label.clone(), &commits, &issues);
 
     let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
 
