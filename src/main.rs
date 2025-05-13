@@ -135,7 +135,7 @@ fn generate_labeled_categories<'a>(
 /// Using pagination to fetch all issues. Just filters for closed issues.
 fn fetch_issues(github_repo: &str, token: &str) -> anyhow::Result<HashMap<i64, Issue>> {
     let url = format!(
-        "https://api.github.com/repos/{}/issues?state=closed",
+        "https://api.github.com/repos/{}/issues?state=all",
         github_repo
     );
     let mut headers = HeaderMap::new();
