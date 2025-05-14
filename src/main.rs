@@ -55,6 +55,14 @@ struct Issue {
     number: i64,
     title: String,
     labels: Vec<IssueLabel>,
+    state: IssueState,
+}
+
+#[derive(PartialEq, Debug, Deserialize)]
+#[serde(rename_all = "lowercase")]
+enum IssueState {
+    Open,
+    Closed,
 }
 
 impl Issue {
@@ -89,12 +97,12 @@ fn generate_labeled_categories<'a>(
     filter_label: Option<String>,
     commits: &[Commit],
     issues: &'a HashMap<i64, Issue>,
-) -> BTreeMap<String, HashSet<&'a Issue>> {
-    let mut categories = BTreeMap::new();
-    let mut category_mapping: HashMap<String, String> = HashMap::new();
-    category_mapping.insert("bug".to_string(), "Fixed Bugs 🐛".to_string());
-    let fallback_category = "Issues Closed";
+) -> Vec<(String, HashSet<&'a Issue>)> {
     let filter_label = filter_label.map(|label| label.to_lowercase());
+    let mut bugs_fixed = Vec::new();
+    let mut closed_issues = Vec::new();
+    let mut non_closed_issues = Vec::new();
+
     for commit in commits {
         if let Some(issue) = &commit.linked_issue {
             if !issues.contains_key(issue) {
@@ -111,23 +119,30 @@ fn generate_labeled_categories<'a>(
                 continue;
             }
 
-            for label in issue.lower_case_labels() {
-                if let Some(category_title) = category_mapping.get(&label) {
-                    categories
-                        .entry(category_title.clone())
-                        .or_insert_with(HashSet::new)
-                        .insert(issue);
-                } else {
-                    categories
-                        .entry(fallback_category.to_string())
-                        .or_insert_with(HashSet::new)
-                        .insert(issue);
-                }
+            if issue.lower_case_labels().contains("bug") && issue.state == IssueState::Closed {
+                bugs_fixed.push(issue);
+            } else if issue.state == IssueState::Closed {
+                closed_issues.push(issue);
+            } else {
+                non_closed_issues.push(issue);
             }
         }
     }
 
-    categories
+    vec![
+        (
+            "🐛 Fixed Bugs ".to_string(),
+            bugs_fixed.into_iter().collect(),
+        ),
+        (
+            "✅ Closed Issues".to_string(),
+            closed_issues.into_iter().collect(),
+        ),
+        (
+            "⚠️ Issues that are mentioned but not closed".to_string(),
+            non_closed_issues.into_iter().collect(),
+        ),
+    ]
 }
 
 /// Returns issue number (not internal ID) mapping to actual Issue data.
@@ -226,12 +241,17 @@ fn main() -> anyhow::Result<()> {
 
     let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
 
-    println!("# {} ({})", args.to, today);
+    // Replace ugly refs/tags if specified.
+    println!("# {} ({})", args.to.replacen("refs/tags/", "", 1), today);
 
-    for title in categories.keys() {
+    for (title, issues) in categories {
+        if issues.is_empty() {
+            continue;
+        }
+
         println!("\n## {}\n", title);
-        for issue in &categories[title] {
-            println!("- {} - #{}", issue.title, issue.number,);
+        for issue in issues {
+            println!("- {} - #{}", issue.title, issue.number);
         }
     }
 
