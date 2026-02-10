@@ -239,10 +239,11 @@ fn main() -> anyhow::Result<()> {
 
     let categories = generate_labeled_categories(args.filter_label.clone(), &commits, &issues);
 
-    let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
+    let from = args.from.replacen("refs/tags/", "", 1);
+    let to = args.to.replacen("refs/tags/", "", 1);
 
     // Replace ugly refs/tags if specified.
-    println!("# {} ({})", args.to.replacen("refs/tags/", "", 1), today);
+    println!("# {} (changes since {})", to, from);
 
     for (title, issues) in categories {
         if issues.is_empty() {
@@ -255,7 +256,10 @@ fn main() -> anyhow::Result<()> {
         }
     }
 
-    println!("\n## Full changelog of commits\n");
+    println!(
+        "\n## Full changelog of commits - Changes from {} to {}\n",
+        from, to
+    );
 
     for commit in &commits {
         println!(
