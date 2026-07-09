@@ -7,7 +7,7 @@ FROM ubuntu:26.04 AS builder
 RUN apt-get update && \
   apt-get install -y libssl-dev pkg-config build-essential curl
 
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- --default-toolchain 1.85.1 -y
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- --default-toolchain 1.96.0 -y
 
 WORKDIR /app
 
