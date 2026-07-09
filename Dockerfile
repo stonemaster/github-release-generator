@@ -1,4 +1,4 @@
-FROM ubuntu:24.04 AS builder
+FROM ubuntu:26.04 AS builder
 
 ##
 ## Builder part
@@ -21,7 +21,7 @@ RUN bash -c 'ls -lah; source ~/.cargo/env; cargo test && cargo build --release'
 ## Deployment part
 ##
 
-FROM ubuntu:24.04
+FROM ubuntu:26.04
 
 RUN apt-get update && \
   apt-get install -y libssl-dev pkg-config ca-certificates git && \
