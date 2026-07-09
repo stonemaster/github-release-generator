@@ -214,12 +214,12 @@ fn main() -> anyhow::Result<()> {
     for oid in revwalk {
         let oid = oid?;
         let commit = repo.find_commit(oid)?;
-        let summary = commit.summary().unwrap_or("<no summary>").to_string();
+        let summary = commit.summary()?.unwrap_or("<no summary>").to_string();
         let author = commit.author().name().unwrap_or("<unknown>").to_string();
         let date = DateTime::from_timestamp(commit.time().seconds(), 0).unwrap();
-        let linked_issue = if commit.message_raw().is_some() {
+        let linked_issue = if let Ok(raw) = commit.message_raw() {
             issue_regex
-                .captures(commit.message_raw().unwrap())
+                .captures(raw)
                 .and_then(|caps| caps.get(1))
                 .map(|m| m.as_str().parse::<i64>().unwrap())
         } else {
